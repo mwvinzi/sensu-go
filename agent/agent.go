@@ -381,6 +381,8 @@ func (a *Agent) sendLoop(ctx context.Context, cancel context.CancelFunc, conn tr
 	defer cancel()
 	keepalive := time.NewTicker(time.Duration(a.config.KeepaliveInterval) * time.Second)
 	defer keepalive.Stop()
+	entity := a.getAgentEntity()
+	fmt.Printf("\tsending initial keepalive in sendLoop with labels = %#v\n", entity.ObjectMeta.Labels)
 	if err := conn.Send(a.newKeepalive()); err != nil {
 		logger.WithError(err).Error("error sending message over websocket")
 		return err
@@ -399,6 +401,8 @@ func (a *Agent) sendLoop(ctx context.Context, cancel context.CancelFunc, conn tr
 				return err
 			}
 		case <-keepalive.C:
+			entity := a.getAgentEntity()
+			fmt.Printf("\tsending keepalive in sendLoop with labels = %#v\n", entity.ObjectMeta.Labels)
 			if err := conn.Send(a.newKeepalive()); err != nil {
 				logger.WithError(err).Error("error sending message over websocket")
 				return err
