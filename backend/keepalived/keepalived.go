@@ -344,47 +344,71 @@ func (k *Keepalived) handleEntityRegistration(entity *corev2.Entity, event *core
 		return nil
 	}
 
+	lager := logger.WithFields(logrus.Fields{
+		"entity":    entity.Name,
+		"namespace": entity.Namespace,
+	})
+
 	ctx := corev2.SetContextFromResource(k.ctx, entity)
 	tctx, cancel := context.WithTimeout(ctx, k.storeTimeout)
 	defer cancel()
 
-	config, _ := corev3.V2EntityToV3(entity)
-	wrapper, err := wrap.Resource(config)
-	if err != nil {
-		logger.WithError(err).Error("error wrapping entity config")
-		return err
+	config, state := corev3.V2EntityToV3(entity)
+
+	// The agentd session expects a watch event for the entity config, therefore
+	// we need to mock one
+	watchEvent := &store.WatchEventEntityConfig{
+		Action: store.WatchUpdate,
 	}
 
+	// Determine if the entity config already exists
 	req := storev2.NewResourceRequestFromResource(tctx, config)
-	exists, err := k.storev2.Exists(req)
+	wrapper, err := k.storev2.Get(req)
 	if err != nil {
-		logger.WithError(err).Error("error checking if entity exists")
-		return err
-	}
-	if exists {
+		// Do not return an error if the entity does not exist
+		if _, ok := err.(*store.ErrNotFound); !ok {
+			lager.WithError(err).Error("error checking if entity exists")
+			return err
+		}
+	} else if wrapper != nil {
+		// A stored entity already exists, therefore we should notify the agent so
+		// it uses this new entity config
+		var storedEntityConfig corev3.EntityConfig
+		if err := wrapper.UnwrapInto(&storedEntityConfig); err != nil {
+			lager.WithError(err).Error("error unwrapping entity config")
+		}
+		watchEvent.Entity = &storedEntityConfig
+		err = k.bus.Publish(messaging.EntityConfigTopic(entity.Namespace, entity.Name), watchEvent)
+		if err != nil {
+			lager.WithError(err).Error("error publishing entity config")
+			return err
+		}
+
+		// Update the keepalive event with the stored entity
+		v2StoredEntity, err := corev3.V3EntityToV2(&storedEntityConfig, state)
+		if err != nil {
+			lager.WithError(err).Error("error converting the entity config to a v2 entity")
+			return err
+		}
+		event.Entity = v2StoredEntity
 		return nil
+	}
+
+	wrapper, err = wrap.Resource(config)
+	if err != nil {
+		lager.WithError(err).Error("error wrapping entity config")
+		return err
 	}
 	if err := k.storev2.CreateIfNotExists(req, wrapper); err == nil {
 		event := createRegistrationEvent(entity)
 		err = k.bus.Publish(messaging.TopicEvent, event)
 		if err != nil {
-			logger.WithError(err).Error("error publishing registration event")
-			return err
-		}
-		// The agentd session expects a watch event for the entity config, therefore
-		// we need to mock one
-		watchEvent := &store.WatchEventEntityConfig{
-			Action: store.WatchCreate,
-			Entity: config,
-		}
-		err = k.bus.Publish(messaging.EntityConfigTopic(config.Metadata.Namespace, config.Metadata.Name), watchEvent)
-		if err != nil {
-			logger.WithError(err).Error("error publishing entity config")
+			lager.WithError(err).Error("error publishing registration event")
 			return err
 		}
 		return nil
 	} else if _, ok := err.(*store.ErrAlreadyExists); ok {
-		logger.WithError(err).Warn("received a check event before entity registration")
+		lager.WithError(err).Warn("received a check event before entity registration")
 		return nil
 	} else {
 		return err

@@ -243,7 +243,7 @@ func TestProcessRegistration(t *testing.T) {
 			storeEntity:       newEntityConfigWithClass("agent"),
 			expectedEventLen:  0,
 			storev2Err:        &stor.ErrAlreadyExists{},
-			expectedEntityLen: 0,
+			expectedEntityLen: 1,
 		},
 		{
 			name:              "Non-Registered Entity",
@@ -251,7 +251,7 @@ func TestProcessRegistration(t *testing.T) {
 			storeEntity:       nil,
 			expectedEventLen:  1,
 			storev2Err:        nil,
-			expectedEntityLen: 1,
+			expectedEntityLen: 0,
 		},
 	}
 
@@ -285,7 +285,6 @@ func TestProcessRegistration(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			storev2.On("Exists", mock.Anything).Return(tc.storeEntity != nil, nil)
 			storev2.On("CreateIfNotExists", mock.Anything, mock.Anything).Return(tc.storev2Err)
 			storev2.On("Get", mock.Anything).Return(tc.storeEntity, nil)
 			err = keepalived.handleEntityRegistration(tc.entity, new(corev2.Event))
