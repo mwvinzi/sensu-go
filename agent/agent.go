@@ -38,9 +38,9 @@ import (
 )
 
 const (
-	// Time to wait for the entity config from agentd before sending the first
-	// keepalive
-	entityConfigGracePeriod = 10 * time.Second
+// Time to wait for the entity config from agentd before sending the first
+// keepalive
+// entityConfigGracePeriod = 10 * time.Second
 )
 
 // GetDefaultAgentName returns the default agent name
@@ -329,15 +329,15 @@ func (a *Agent) connectionManager(ctx context.Context, cancel context.CancelFunc
 
 		// Make sure the entity config chan is empty by discarding whatever is in
 		// there, so we can block until we receive an update from agentd
-		select {
-		case <-a.entityConfigCh:
-		default:
-		}
+		// select {
+		// case <-a.entityConfigCh:
+		// default:
+		// }
 
 		// Do not handle check request until we receive the entity config from the
 		// backend, so we don't send a stale config
 
-		a.handler.AddHandler(corev2.CheckRequestType, a.handleCheckNoop)
+		// a.handler.AddHandler(corev2.CheckRequestType, a.handleCheckNoop)
 
 		a.clearAgentEntity()
 
@@ -362,16 +362,16 @@ func (a *Agent) connectionManager(ctx context.Context, cancel context.CancelFunc
 		go a.receiveLoop(ctx, cancel, conn)
 
 		// Block until we receive an entity config, or the grace period expires
-		select {
-		case <-a.entityConfigCh:
-			logger.Debug("successfully received the initial entity config")
-		case <-time.After(entityConfigGracePeriod):
-			logger.Warning("the initial entity config was never received, using the local entity")
-		case <-ctx.Done():
-			// The connection was closed before we received an entity config or we
-			// reached the grace period
-			continue
-		}
+		// select {
+		// case <-a.entityConfigCh:
+		// 	logger.Debug("successfully received the initial entity config")
+		// case <-time.After(entityConfigGracePeriod):
+		// 	logger.Warning("the initial entity config was never received, using the local entity")
+		// case <-ctx.Done():
+		// 	// The connection was closed before we received an entity config or we
+		// 	// reached the grace period
+		// 	continue
+		// }
 
 		// Handle check config requests
 		a.handler.AddHandler(corev2.CheckRequestType, a.handleCheck)

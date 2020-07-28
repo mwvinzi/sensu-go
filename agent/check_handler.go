@@ -72,9 +72,9 @@ func (a *Agent) handleCheck(ctx context.Context, payload []byte) error {
 }
 
 // handleCheckNoop is used to discard incoming check requests
-func (a *Agent) handleCheckNoop(ctx context.Context, payload []byte) error {
-	return nil
-}
+// func (a *Agent) handleCheckNoop(ctx context.Context, payload []byte) error {
+// 	return nil
+// }
 
 func (a *Agent) checkInProgress(req *corev2.CheckRequest) bool {
 	a.inProgressMu.Lock()
